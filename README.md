@@ -11,6 +11,36 @@ should show the information supporting them. Instead of returning only an AI
 opinion, FinSight pairs summaries and insights with the underlying market data,
 supporting metrics, tool activity, and source links.
 
+FinSight's defining feature is its **dynamic financial website**. A user's query
+does not simply fill a fixed answer template: it generates a purpose-built page
+composition for that question. A stock-price request can become a compact price
+view, a comparison can become a multi-company dashboard, a historical query can
+lead with an interactive chart, and a news request can become a source-backed
+news digest. The result is one application that adapts its content, hierarchy,
+and presentation to the research being performed.
+
+## Core feature: a website shaped by every query
+
+Each answer is returned with a validated presentation manifest describing which
+interface blocks should appear, their order, layout, visual variant, and
+responsive width. The frontend uses this manifest to assemble the result from
+reusable components such as:
+
+- headline price cards
+- metric and company grids
+- interactive financial charts
+- insight and supporting-evidence panels
+- market and comparison dashboards
+- financial news feeds
+- source and tool-activity sections
+
+This provides the experience of generating a financial website from a
+natural-language command without allowing the model to execute arbitrary
+frontend code.
+Gemini creates and organizes the financial content, while the backend validates
+the response and the frontend renders only allow-listed React components. This
+keeps the experience dynamic, consistent, responsive, and safe.
+
 ## Features
 
 - Natural-language research across stocks, companies, markets, and news
@@ -22,7 +52,7 @@ supporting metrics, tool activity, and source links.
 - Regional market overviews for US, Indian, and global markets
 - Recent financial news with publisher and source links
 - Evidence-backed summaries and insights
-- Query-specific layouts generated from a safe presentation manifest
+- A dynamic website whose layout and components adapt to every query
 - Saved research history with reopen and delete support
 - Response and tool-result caching
 - Structured request logging, stable error responses, rate limits, and timeouts
