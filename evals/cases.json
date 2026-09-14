@@ -1,0 +1,65 @@
+[
+  {
+    "id": "current_price_us",
+    "question": "What is Apple's latest stock price?",
+    "expected_tools": ["get_stock_price"],
+    "expected_arguments": {"get_stock_price": {"ticker": "AAPL"}}
+  },
+  {
+    "id": "current_price_india",
+    "question": "What is the current price of PAYTM.NS?",
+    "expected_tools": ["get_stock_price"],
+    "expected_arguments": {"get_stock_price": {"ticker": "PAYTM.NS"}}
+  },
+  {
+    "id": "history_six_months",
+    "question": "How has Tesla performed over the last six months?",
+    "expected_tools": ["get_stock_history"],
+    "expected_arguments": {"get_stock_history": {"ticker": "TSLA", "period": "6mo"}}
+  },
+  {
+    "id": "compare_one_year",
+    "question": "Compare Apple and Microsoft stock performance over one year.",
+    "expected_tools": ["compare_stocks"],
+    "expected_arguments": {"compare_stocks": {"tickers": ["AAPL", "MSFT"], "period": "1y"}}
+  },
+  {
+    "id": "company_profile",
+    "question": "What does NVIDIA do and which industry is it in?",
+    "expected_tools": ["get_company_details"],
+    "expected_arguments": {"get_company_details": {"ticker": "NVDA"}}
+  },
+  {
+    "id": "financial_metrics",
+    "question": "Give me Microsoft's valuation and profitability metrics.",
+    "expected_tools": ["get_financial_metrics"],
+    "expected_arguments": {"get_financial_metrics": {"ticker": "MSFT"}}
+  },
+  {
+    "id": "company_news",
+    "question": "Show me recent financial news about Amazon.",
+    "expected_tools": ["get_financial_news"]
+  },
+  {
+    "id": "us_market",
+    "question": "How are US markets performing today?",
+    "expected_tools": ["get_market_overview"],
+    "expected_arguments": {"get_market_overview": {"region": "US"}}
+  },
+  {
+    "id": "india_market",
+    "question": "Give me an overview of the Indian stock market today.",
+    "expected_tools": ["get_market_overview"],
+    "expected_arguments": {"get_market_overview": {"region": "INDIA"}}
+  },
+  {
+    "id": "why_stock_moved",
+    "question": "Why is Tesla stock moving today? Use current market data and recent news.",
+    "expected_tools": ["get_stock_price", "get_financial_news"]
+  },
+  {
+    "id": "no_tool_definition",
+    "question": "Explain what a price-to-earnings ratio means without looking up any company.",
+    "expected_tools": []
+  }
+]
