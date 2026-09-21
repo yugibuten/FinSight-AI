@@ -10,6 +10,8 @@ class ResearchListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    conversation_id: str | None
+    turn_index: int | None
     question: str
     response_type: str | None
     status: str

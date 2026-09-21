@@ -1,7 +1,9 @@
 from typing import Any
 
 import pandas as pd
-import yfinance as yf
+
+from app.providers import get_market_data_provider
+from app.analytics import calculate_price_analytics
 
 VALID_PERIODS = {"5d", "1mo", "3mo", "6mo", "1y", "2y", "5y"}
 
@@ -23,7 +25,7 @@ def get_stock_price(ticker: str) -> dict[str, Any]:
     """Return the latest close and change from the prior trading session."""
     symbol = normalize_symbol(ticker)
     try:
-        stock = yf.Ticker(symbol)
+        stock = get_market_data_provider().ticker(symbol)
         history = stock.history(period="5d", interval="1d", auto_adjust=False)
         closes = history["Close"].dropna() if not history.empty else pd.Series(dtype=float)
         if closes.empty:
@@ -52,7 +54,7 @@ def get_stock_history(ticker: str, period: str = "6mo") -> dict[str, Any]:
         return {"success": False, "ticker": symbol, "error": f"Unsupported period: {period}"}
 
     try:
-        stock = yf.Ticker(symbol)
+        stock = get_market_data_provider().ticker(symbol)
         history = stock.history(period=period, interval="1d", auto_adjust=False)
         closes = history["Close"].dropna() if not history.empty else pd.Series(dtype=float)
         if closes.empty:
@@ -73,6 +75,7 @@ def get_stock_history(ticker: str, period: str = "6mo") -> dict[str, Any]:
             "change_percent": safe_number((end - start) / start * 100 if start else None),
             "high": safe_number(closes.max()),
             "low": safe_number(closes.min()),
+            "analytics": calculate_price_analytics(closes),
             "prices": [
                 {"date": timestamp.date().isoformat(), "close": safe_number(close)}
                 for timestamp, close in sampled.items()

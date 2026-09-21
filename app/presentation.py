@@ -50,29 +50,35 @@ def build_presentation(
     ]
 
     response_type = synthesis.response_type
-    blocks: list[PresentationBlock] = []
+    blocks: list[PresentationBlock] = [
+        _block("direct-answer", "direct_answer", "direct_answer", variant="featured")
+    ]
 
     if response_type == "stock_price":
         layout = "compact"
         if available["headline"]:
             blocks.append(_block("headline", "headline", "headline", variant="price"))
-        blocks.append(_block("summary", "summary", "summary", variant="featured"))
         if available["metrics"]:
             blocks.append(_block("metrics", "metric_grid", "metrics", variant="compact"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     elif response_type == "stock_history":
         layout = "research_dashboard"
         if available["headline"]:
             blocks.append(_block("headline", "headline", "headline", variant="performance"))
-        blocks.extend(chart_blocks)
+        blocks.extend(
+            block.model_copy(update={"span": "two_thirds"})
+            if available["metrics"] else block
+            for block in chart_blocks
+        )
         if available["metrics"]:
             blocks.append(_block("metrics", "metric_grid", "metrics", "one_third"))
-        blocks.append(_block("summary", "summary", "summary", "two_thirds", "featured"))
         if available["insights"]:
             blocks.append(_block("insights", "insight_list", "insights", "half"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence", "half"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     elif response_type == "stock_comparison":
         layout = "comparison_dashboard"
         if available["companies"]:
@@ -80,51 +86,52 @@ def build_presentation(
         blocks.extend(chart_blocks)
         if available["metrics"]:
             blocks.append(_block("metrics", "metric_grid", "metrics"))
-        blocks.append(_block("summary", "summary", "summary", "two_thirds", "featured"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence", "one_third"))
         if available["insights"]:
             blocks.append(_block("insights", "insight_list", "insights"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     elif response_type == "financial_news":
         layout = "news_digest"
         if available["headline"]:
             blocks.append(_block("headline", "headline", "headline", variant="compact"))
-        blocks.append(_block("summary", "summary", "summary", variant="featured"))
         if available["news"]:
             blocks.append(_block("news", "news_feed", "news"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     elif response_type == "market_overview":
         layout = "market_dashboard"
+        blocks.extend(
+            block.model_copy(update={"span": "two_thirds"})
+            if available["metrics"] else block
+            for block in chart_blocks
+        )
         if available["metrics"]:
-            blocks.append(_block("metrics", "metric_grid", "metrics", variant="featured"))
-        blocks.extend(chart_blocks)
-        blocks.append(_block("summary", "summary", "summary", "two_thirds", "featured"))
+            blocks.append(_block("metrics", "metric_grid", "metrics", "one_third", "featured"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence", "one_third"))
         if available["insights"]:
             blocks.append(_block("insights", "insight_list", "insights"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     elif response_type == "company_research":
         layout = "research_dashboard"
         if available["companies"]:
             blocks.append(_block("companies", "company_grid", "companies", variant="featured"))
         if available["metrics"]:
             blocks.append(_block("metrics", "metric_grid", "metrics"))
-        blocks.append(_block("summary", "summary", "summary", "two_thirds", "featured"))
         if available["insights"]:
             blocks.append(_block("insights", "insight_list", "insights", "one_third"))
         if available["evidence"]:
             blocks.append(_block("evidence", "evidence", "evidence"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
     else:
         layout = "explainer"
-        blocks.append(_block("summary", "summary", "summary", variant="featured"))
         if available["insights"]:
             blocks.append(_block("insights", "insight_list", "insights"))
+        blocks.append(_block("summary", "summary", "summary", variant="featured"))
 
-    # Factual responses must expose their evidence trail. Debug activity remains
-    # last and collapsed in the frontend.
+    # Factual responses end with their evidence trail.
     if available["sources"]:
         blocks.append(_block("sources", "source_list", "sources"))
-    if available["tools"]:
-        blocks.append(_block("tools", "tool_activity", "tool_calls", variant="compact"))
     return PresentationPlan(layout=layout, blocks=blocks)

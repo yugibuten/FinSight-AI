@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FinSight V3 — Financial intelligence",
+  title: "FinSight — Financial intelligence",
   description: "Understand markets through grounded, natural-language research.",
 };
 

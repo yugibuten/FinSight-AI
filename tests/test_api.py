@@ -32,6 +32,19 @@ def test_local_frontend_cors() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
+def test_local_frontend_can_preflight_delete() -> None:
+    response = client.options(
+        "/api/v1/research/res_example",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert "DELETE" in response.headers["access-control-allow-methods"]
+
+
 def test_query_contract(monkeypatch) -> None:
     monkeypatch.setattr(
         query_module,

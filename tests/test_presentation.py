@@ -5,19 +5,19 @@ from app.presentation import build_presentation
 
 
 @pytest.mark.parametrize(
-    ("response_type", "expected_layout", "first_block"),
+    ("response_type", "expected_layout"),
     [
-        ("stock_price", "compact", "headline"),
-        ("stock_history", "research_dashboard", "headline"),
-        ("stock_comparison", "comparison_dashboard", "company_grid"),
-        ("company_research", "research_dashboard", "company_grid"),
-        ("financial_news", "news_digest", "headline"),
-        ("market_overview", "market_dashboard", "metric_grid"),
-        ("general_explanation", "explainer", "summary"),
+        ("stock_price", "compact"),
+        ("stock_history", "research_dashboard"),
+        ("stock_comparison", "comparison_dashboard"),
+        ("company_research", "research_dashboard"),
+        ("financial_news", "news_digest"),
+        ("market_overview", "market_dashboard"),
+        ("general_explanation", "explainer"),
     ],
 )
 def test_query_type_selects_its_own_layout(
-    response_type: str, expected_layout: str, first_block: str
+    response_type: str, expected_layout: str
 ) -> None:
     synthesis = FinSightSynthesis.model_validate(
         {
@@ -40,9 +40,10 @@ def test_query_type_selects_its_own_layout(
     )
 
     assert plan.layout == expected_layout
-    assert plan.blocks[0].type == first_block
-    assert plan.blocks[-2].type == "source_list"
-    assert plan.blocks[-1].type == "tool_activity"
+    assert plan.blocks[0].type == "direct_answer"
+    assert next(block for block in reversed(plan.blocks) if block.type != "source_list").type == "summary"
+    assert plan.blocks[-1].type == "source_list"
+    assert all(block.type != "tool_activity" for block in plan.blocks)
 
 
 def test_plan_never_references_empty_optional_data() -> None:
@@ -54,6 +55,7 @@ def test_plan_never_references_empty_optional_data() -> None:
     plan = build_presentation(synthesis, charts=[], sources=[], tool_calls=[])
 
     assert [(block.type, block.data_ref) for block in plan.blocks] == [
+        ("direct_answer", "direct_answer"),
         ("summary", "summary")
     ]
 

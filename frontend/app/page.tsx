@@ -1,103 +1,106 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { QueryForm } from "@/components/QueryForm";
-import { ResearchHistory } from "@/components/ResearchHistory";
+import { MarketTicker } from "@/components/MarketTicker";
 import { ResultView } from "@/components/ResultView";
-import { askFinSight, deleteSavedResearch, getResearchHistory, getSavedResearch } from "@/lib/api";
-import type { FinSightResponse, ResearchListItem } from "@/lib/types";
+import { streamFinSight } from "@/lib/api";
+import type { FinSightResponse, PresentationBlock } from "@/lib/types";
 
 export default function Home() {
   const [result, setResult] = useState<FinSightResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeQuestion, setActiveQuestion] = useState("");
-  const [history, setHistory] = useState<ResearchListItem[]>([]);
-  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
-
-  const refreshHistory = useCallback(async () => {
-    try {
-      setHistory(await getResearchHistory());
-    } catch {
-      // The main query experience remains usable if history is unavailable.
-    }
-  }, []);
-
-  useEffect(() => { void refreshHistory(); }, [refreshHistory]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const streamController = useRef<AbortController | null>(null);
 
   async function ask(question: string) {
+    if (loading) return;
     setActiveQuestion(question);
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
     try {
-      setResult(await askFinSight(question));
-      await refreshHistory();
+      await streamFinSight(
+        question,
+        conversationId,
+        result?.canvas_revision,
+        (event, data) => {
+          if (event === "response_start") {
+            const response = data.response as FinSightResponse;
+            setResult(response);
+            setConversationId(response.conversation_id ?? null);
+          } else if (event === "component") {
+            const block = data.block as PresentationBlock;
+            setResult((current) => current ? {
+              ...current,
+              presentation: {
+                layout: current.presentation?.layout ?? "explainer",
+                blocks: [...(current.presentation?.blocks ?? []), block],
+              },
+            } : current);
+          }
+        },
+        controller.signal,
+      );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Something went wrong");
+      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+        setError(cause instanceof Error ? cause.message : "Something went wrong");
+      }
     } finally {
+      if (streamController.current === controller) streamController.current = null;
       setLoading(false);
     }
   }
 
-  async function openResearch(id: string) {
-    setHistoryBusyId(id);
+  function startNewResearch() {
+    streamController.current?.abort();
+    streamController.current = null;
+    setResult(null);
     setError(null);
-    try {
-      const saved = await getSavedResearch(id);
-      if (saved.result) {
-        setResult(saved.result);
-        setActiveQuestion(saved.result.query);
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not open saved research");
-    } finally {
-      setHistoryBusyId(null);
-    }
-  }
-
-  async function removeResearch(id: string) {
-    setHistoryBusyId(id);
-    try {
-      await deleteSavedResearch(id);
-      setHistory((items) => items.filter((item) => item.id !== id));
-      if (result?.research_id === id) setResult(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not delete saved research");
-    } finally {
-      setHistoryBusyId(null);
-    }
+    setActiveQuestion("");
+    setConversationId(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
     <main className="app-shell">
       <nav className="topbar">
-        <a className="brand" href="#"><span>F</span> FinSight</a>
-        <div className="status"><i /> FinSight V3</div>
+        <button className="brand brand-button" onClick={startNewResearch}><span>F</span> FinSight</button>
+        <MarketTicker onSelect={(symbol) => {
+          if (!loading) void ask(`Show me the latest price for ${symbol}`);
+        }} />
+        <div className="nav-actions">
+          {conversationId && <button className="new-research" onClick={startNewResearch}>＋ New research</button>}
+          <div className="status" title="Quotes may be delayed"><i /> Market snapshot</div>
+        </div>
       </nav>
 
       <div className="conversation">
         {!result && !loading && (
           <section className="welcome">
-            <div className="welcome-mark">F</div>
-            <span className="hero-kicker">Grounded financial intelligence</span>
-            <h1>What can I help you <em>understand?</em></h1>
-            <p>Research a stock, compare companies, follow market movements, or unpack a financial story.</p>
+            <h1>Welcome to FinSight</h1>
+            <p className="welcome-promise"><span>Markets.</span> <span>Explained.</span> <em>Clearly.</em></p>
           </section>
         )}
-
-        {!loading && !result && <ResearchHistory items={history} busyId={historyBusyId} onOpen={openResearch} onDelete={removeResearch} />}
-        {(result || loading) && <div className="user-message"><span>You</span><p>{activeQuestion || result?.query}</p></div>}
-        {loading && <section className="loading-card" aria-live="polite">
+        {loading && <section className={`loading-card ${result ? "canvas-loading" : ""}`} aria-live="polite">
           <div className="loader"><i /><i /><i /></div>
-          <div><strong>Building your research brief</strong><span>Finding data, checking evidence, and preparing the answer…</span></div>
+          <div className="loading-copy"><span>{activeQuestion}</span></div>
         </section>}
+        {loading && !result && <div className="research-skeleton" aria-hidden="true">
+          <div className="skeleton-price"><i /><i /><i /></div>
+          <div className="skeleton-summary"><i /><i /><i /></div>
+          <div className="skeleton-grid"><div><i /><i /></div><div><i /><i /></div><div><i /><i /></div></div>
+        </div>}
         {error && <div className="error-card"><b>We couldn’t complete that research.</b><span>{error}</span></div>}
-        {result && !loading && <ResultView result={result} />}
+        {result && <ResultView key={`${result.research_id}-${result.canvas_revision ?? 0}`} result={result} onFollowUp={ask} />}
         <footer>FinSight uses market data for research and education. It is not financial advice.</footer>
       </div>
 
       <div className="composer-dock">
-        <QueryForm loading={loading} onSubmit={ask} showExamples={!result && !loading} />
+        <QueryForm loading={loading} onSubmit={ask} />
         <small>FinSight can make mistakes. Verify important financial information.</small>
       </div>
     </main>

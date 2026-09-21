@@ -52,3 +52,23 @@ class QueryTimeoutError(AppError):
 class ResearchNotFoundError(AppError):
     def __init__(self) -> None:
         super().__init__("RESEARCH_NOT_FOUND", "The saved research was not found.", 404)
+
+
+class ConversationNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__("CONVERSATION_NOT_FOUND", "The conversation was not found.", 404)
+
+
+class CanvasRevisionConflictError(AppError):
+    def __init__(self) -> None:
+        super().__init__(
+            "CANVAS_REVISION_CONFLICT",
+            "The research page changed before this command was applied. Refresh and try again.",
+            409,
+            retryable=True,
+        )
+
+
+class CanvasNotFoundError(AppError):
+    def __init__(self) -> None:
+        super().__init__("CANVAS_NOT_FOUND", "The conversation has no research page yet.", 404)

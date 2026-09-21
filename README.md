@@ -41,10 +41,33 @@ Gemini creates and organizes the financial content, while the backend validates
 the response and the frontend renders only allow-listed React components. This
 keeps the experience dynamic, consistent, responsive, and safe.
 
+### On-demand canvas commands
+
+The generated research page persists throughout a conversation. Users can
+modify it with natural-language commands instead of rebuilding the whole page:
+
+```text
+Also bring up the latest news on screen.
+Add Tesla to this comparison.
+Hide the supporting evidence.
+Refresh the market metrics.
+```
+
+FinSight converts these requests into validated canvas operations. Add and
+refresh commands retrieve any required financial data and merge only the
+relevant blocks; remove commands can update the page without another Gemini
+call. The frontend keeps the current page visible while the command runs and
+briefly highlights changed sections when the new revision arrives.
+
+Each canvas has an incrementing revision number. Clients send that revision
+with their next command, preventing stale updates from silently overwriting
+newer research. Applied canvas operations are stored as an audit trail.
+
 ## Features
 
 - Natural-language research across stocks, companies, markets, and news
 - Gemini-powered intent understanding, tool selection, and answer synthesis
+- A validated query plan covering intent, entities, periods, tools, and UI blocks
 - Current stock prices and daily price movement
 - Historical price analysis and interactive charts
 - Normalized performance comparisons for multiple stocks
@@ -52,8 +75,13 @@ keeps the experience dynamic, consistent, responsive, and safe.
 - Regional market overviews for US, Indian, and global markets
 - Recent financial news with publisher and source links
 - Evidence-backed summaries and insights
+- Claim-level source IDs with clickable citations
+- Deterministic CAGR, volatility, drawdown, and moving-average calculations
+- A swappable market-data provider layer with Yahoo Finance as the default
 - A dynamic website whose layout and components adapt to every query
+- An on-demand canvas that can add, remove, replace, or refresh page sections
 - Saved research history with reopen and delete support
+- Context-aware conversations for follow-up research questions
 - Response and tool-result caching
 - Structured request logging, stable error responses, rate limits, and timeouts
 - Deterministic fallback answers when market data succeeds but AI synthesis fails
@@ -91,7 +119,9 @@ Dynamic frontend components
 ```
 
 Gemini determines which tools are needed and supplies their arguments. Tool
-results are then returned to the model for synthesis. Numeric chart data and
+selection is guided by a validated plan containing the detected intent,
+companies, region, time period, live-data requirement, canvas action, and
+expected page blocks. Tool results are then returned to the model for synthesis. Numeric chart data and
 source records are built deterministically from tool output rather than being
 invented by the model.
 
@@ -183,6 +213,9 @@ Backend settings are loaded from `.env` and validated at startup.
 |---|---|---|
 | `GEMINI_API_KEY` | Required | Gemini authentication |
 | `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini model used for orchestration |
+| `GEMINI_FAST_MODEL` | `gemini-3.5-flash` | Model used for simple synthesis |
+| `GEMINI_COMPLEX_MODEL` | `gemini-3.5-flash` | Model used for comparisons and research |
+| `REDIS_URL` | Unset | Optional shared cache connection URL |
 | `FRONTEND_ORIGINS` | Local frontend origins | Allowed CORS origins |
 | `APP_ENVIRONMENT` | `development` | Runtime environment name |
 | `QUERY_TIMEOUT_SECONDS` | `45` | Maximum query processing time |
@@ -246,19 +279,45 @@ is the most reliable input.
 | `GET` | `/api/v1/research` | List recent saved research |
 | `GET` | `/api/v1/research/{research_id}` | Retrieve a complete saved result |
 | `DELETE` | `/api/v1/research/{research_id}` | Delete saved research |
+| `POST` | `/api/v1/conversations` | Create an explicit research conversation |
+| `GET` | `/api/v1/conversations` | List conversations |
+| `GET` | `/api/v1/conversations/{conversation_id}` | Retrieve a conversation and its turns |
+| `DELETE` | `/api/v1/conversations/{conversation_id}` | Delete a conversation and its turns |
+| `GET` | `/api/v1/conversations/{conversation_id}/canvas` | Retrieve the current generated page |
 
 Unversioned compatibility aliases are currently hidden from the OpenAPI schema.
 New clients should always use `/api/v1`.
+
+### Follow-up questions
+
+The first query automatically creates a conversation and returns its
+`conversation_id`. Send that identifier with a related follow-up:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question":"Compare it with Microsoft over the same period.",
+    "conversation_id":"con_0123456789abcdef0123456789abcdef"
+  }'
+```
+
+FinSight uses compact summaries of recent turns only when the wording depends on
+earlier context. Standalone questions do not receive previous context, even when
+they are stored in the same conversation. Starting a new research session in the
+frontend clears the conversation boundary completely.
 
 ## Response model and dynamic interface
 
 Each query returns a structured response containing:
 
 - `response_type`, `title`, `summary`, and an optional primary `headline`
+- `query_plan`, including detected entities, period, required tools, and canvas intent
 - `insights`, `metrics`, and evidence connecting claims to supporting facts
 - `companies` and `news` when relevant to the question
 - deterministic `charts` generated from retrieved numeric data
 - `sources` reconstructed from actual tool results
+- `source_ids` connecting headlines, metrics, evidence, and news to those sources
 - `tool_calls` for auditability and evaluation
 - a validated `presentation` plan describing block order, layout, and variants
 - `research_id` and `generated_at` metadata
@@ -280,10 +339,21 @@ charts. Every chart also includes an expandable data table for accessibility.
 | `get_stock_price` | Retrieve the latest close and daily movement |
 | `get_stock_history` | Retrieve historical prices and calculated performance |
 | `compare_stocks` | Compare normalized performance for two to five stocks |
+| `compare_financial_metrics` | Compare valuation, growth, and profitability metrics |
 | `get_company_details` | Retrieve company profile and classification data |
 | `get_financial_metrics` | Retrieve valuation, growth, margin, cash, and debt metrics |
 | `get_financial_news` | Retrieve recent company news and source links |
 | `get_market_overview` | Retrieve major US, Indian, or global index movements |
+
+Historical stock results also include deterministic analytics calculated from
+daily closes: CAGR, annualized volatility, maximum drawdown, 20-day moving
+average, and 50-day moving average. These values are calculated in Python and
+are never estimated by Gemini.
+
+Financial tools depend on a `MarketDataProvider` interface rather than importing
+a vendor SDK directly. Yahoo Finance is the current adapter; another free or
+commercial provider can be introduced without rewriting orchestration or tool
+contracts.
 
 ## Reliability and observability
 
@@ -298,16 +368,39 @@ FinSight includes several protections around the AI and data-provider workflow:
 - bounded TTL caches for full responses and individual tool results
 - deterministic synthesis fallback when tools succeed but Gemini is unavailable
 
+### Performance pipeline
+
+The validated query plan limits Gemini to only the tools relevant to the current
+request. When all required arguments are known, FinSight executes those tools
+before synthesis and runs independent calls concurrently. This removes the
+model's initial tool-selection round trip for common queries. Direct stock-price
+requests use a deterministic no-LLM fast path after retrieving verified data.
+
+Simple and complex synthesis can use different Gemini models through
+`GEMINI_FAST_MODEL` and `GEMINI_COMPLEX_MODEL`. Every response includes a
+`performance` object with planning, tool, provider, and total processing times,
+the selected model, and whether the fast path was used. The same information is
+available in structured `query.performance` logs and the frontend tool-activity
+panel.
+
+The frontend presents progressive planning, data retrieval, and page-building
+states while initial research runs. On-demand canvas changes retain the existing
+page and show a targeted update state.
+
 Failed tool results and API errors are not cached. Tool cache lifetimes reflect
 the expected volatility of each data type, ranging from seconds for prices to
-hours for company profiles. The current caches and rate limiter are process-local;
-a distributed deployment should use a shared store such as Redis.
+hours for company profiles. Without additional configuration, caches and rate
+limiting remain process-local. Setting `REDIS_URL` enables Redis-backed response
+and tool caches with automatic fallback to the local bounded cache if Redis is
+unavailable. The rate limiter should use a shared implementation before a
+multi-instance public deployment.
 
 ## Persistence and migrations
 
 Every completed or failed query is recorded. Local development uses SQLite and
-stores research queries, structured results, and tool-execution telemetry. The
-same SQLAlchemy layer supports PostgreSQL by changing `DATABASE_URL`:
+stores conversations, ordered research turns, structured results, and
+tool-execution telemetry. The same SQLAlchemy layer supports PostgreSQL by
+changing `DATABASE_URL`:
 
 ```env
 DATABASE_URL=postgresql+psycopg://user:password@host:5432/finsight
@@ -357,8 +450,10 @@ python -m evals.run_evals
 ```
 
 Evaluation cases live in `evals/cases.json`, and the latest report is written to
-`evals/reports/latest.json`. Cases check answer completion, tool selection, and
-critical tool arguments.
+`evals/reports/latest.json`. Cases check answer completion, query planning, tool
+selection, critical arguments, and required source evidence. The suite includes
+price, history, market, news, movement explanation, risk analytics, Indian
+symbols, and valuation-comparison cases.
 
 ## Data and security considerations
 

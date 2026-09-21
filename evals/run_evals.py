@@ -48,11 +48,22 @@ def grade_case(case: dict[str, Any], result: dict[str, Any], strict: bool) -> di
             )
 
     answer_pass = bool(result.get("summary", "").strip())
+    expected_plan = case.get("expected_plan", {})
+    actual_plan = result.get("query_plan") or {}
+    plan_failures = {
+        key: {"expected": value, "actual": actual_plan.get(key)}
+        for key, value in expected_plan.items()
+        if not _equal(value, actual_plan.get(key))
+    }
+    sources_pass = not case.get("requires_sources") or bool(result.get("sources"))
     return {
-        "passed": tools_pass and not argument_failures and answer_pass,
+        "passed": tools_pass and not argument_failures and answer_pass and not plan_failures and sources_pass,
         "tools_pass": tools_pass,
         "arguments_pass": not argument_failures,
         "answer_present": answer_pass,
+        "plan_pass": not plan_failures,
+        "plan_failures": plan_failures,
+        "sources_pass": sources_pass,
         "expected_tools": expected_names,
         "actual_tools": actual_names,
         "argument_failures": argument_failures,

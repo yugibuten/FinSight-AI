@@ -7,11 +7,32 @@ export type ResponseType =
   | "market_overview"
   | "general_explanation";
 
+export interface QueryPlan {
+  intent: ResponseType;
+  entities: string[];
+  region?: "US" | "INDIA" | "GLOBAL" | null;
+  period?: "5d" | "1mo" | "3mo" | "6mo" | "1y" | "2y" | "5y" | null;
+  required_tools: string[];
+  requires_live_data: boolean;
+  canvas_action?: "add" | "remove" | "replace" | "refresh" | null;
+  requested_blocks: string[];
+}
+
+export interface PerformanceTiming {
+  planning_ms: number;
+  tools_ms: number;
+  provider_ms: number;
+  total_ms: number;
+  fast_path: boolean;
+  model?: string | null;
+}
+
 export interface HeadlineMetric {
   label: string;
   value: string;
   change?: string | null;
   context?: string | null;
+  source_ids?: string[];
 }
 
 export interface Metric {
@@ -20,6 +41,7 @@ export interface Metric {
   change?: string | null;
   context?: string | null;
   ticker?: string | null;
+  source_ids?: string[];
 }
 
 export interface Company {
@@ -38,6 +60,7 @@ export interface NewsItem {
   published_at?: string | null;
   summary?: string | null;
   url?: string | null;
+  source_ids?: string[];
 }
 
 export interface Evidence {
@@ -45,9 +68,16 @@ export interface Evidence {
   metric: string;
   value: string;
   explanation?: string | null;
+  source_ids?: string[];
+}
+
+export interface InsightCitation {
+  text: string;
+  source_ids: string[];
 }
 
 export interface Source {
+  id?: string | null;
   title: string;
   url: string;
   provider: string;
@@ -80,7 +110,9 @@ export interface Chart {
 }
 
 export type PresentationBlockType =
+  | "direct_answer"
   | "headline"
+  | "headline_grid"
   | "summary"
   | "chart"
   | "metric_grid"
@@ -111,14 +143,32 @@ export interface PresentationPlan {
   blocks: PresentationBlock[];
 }
 
+export interface CanvasOperation {
+  operation: "add" | "remove" | "replace" | "refresh";
+  block_type: PresentationBlockType;
+  block_id?: string | null;
+  target_entity?: string | null;
+}
+
 export interface FinSightResponse {
   research_id: string;
+  conversation_id?: string | null;
+  canvas_id?: string | null;
+  canvas_revision?: number | null;
+  canvas_mode?: "full" | "patch";
+  canvas_operations?: CanvasOperation[];
+  query_plan?: QueryPlan | null;
+  performance?: PerformanceTiming | null;
   query: string;
   response_type: ResponseType;
   title: string;
+  direct_answer?: string;
   summary: string;
+  summary_source_ids?: string[];
   headline?: HeadlineMetric | null;
+  headlines?: HeadlineMetric[];
   insights: string[];
+  insight_citations?: InsightCitation[];
   metrics: Metric[];
   companies: Company[];
   news: NewsItem[];
@@ -130,8 +180,27 @@ export interface FinSightResponse {
   generated_at: string;
 }
 
+export interface MarketTickerItem {
+  name: string;
+  symbol: string;
+  price?: number | null;
+  currency?: string | null;
+  change_percent?: number | null;
+  as_of?: string | null;
+  available: boolean;
+}
+
+export interface MarketTickerSnapshot {
+  label: string;
+  delayed: boolean;
+  items: MarketTickerItem[];
+  generated_at: string;
+}
+
 export interface ResearchListItem {
   id: string;
+  conversation_id?: string | null;
+  turn_index?: number | null;
   question: string;
   response_type?: string | null;
   status: string;
@@ -140,6 +209,35 @@ export interface ResearchListItem {
   error_code?: string | null;
   created_at: string;
   completed_at?: string | null;
+}
+
+export interface ConversationListItem {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  turn_count: number;
+}
+
+export interface ConversationTurn {
+  research_id: string;
+  turn_index: number;
+  question: string;
+  status: string;
+  result?: FinSightResponse | null;
+}
+
+export interface ConversationDetail extends ConversationListItem {
+  turns: ConversationTurn[];
+}
+
+export interface CanvasDetail {
+  id: string;
+  conversation_id: string;
+  revision: number;
+  response: FinSightResponse;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ResearchDetail extends ResearchListItem {

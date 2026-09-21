@@ -60,7 +60,10 @@ class RequestGuardMiddleware(BaseHTTPMiddleware):
         self._lock = Lock()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if request.method == "POST" and request.url.path.endswith("/query"):
+        if request.method == "POST" and (
+            request.url.path.endswith("/query")
+            or request.url.path.endswith("/query/stream")
+        ):
             request_id = getattr(request.state, "request_id", "unknown")
             content_length = request.headers.get("content-length")
             try:

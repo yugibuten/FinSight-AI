@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-import yfinance as yf
+from app.providers import get_market_data_provider
 
 
 def _article(raw: dict[str, Any]) -> dict[str, Any]:
@@ -29,14 +29,7 @@ def get_financial_news(query: str, limit: int = 5) -> dict[str, Any]:
         raise ValueError("query cannot be empty")
     bounded_limit = max(1, min(limit, 10))
     try:
-        results = yf.Search(
-            clean_query,
-            max_results=0,
-            news_count=bounded_limit,
-            lists_count=0,
-            include_research=False,
-            timeout=15,
-        ).news
+        results = get_market_data_provider().search_news(clean_query, bounded_limit)
         articles = [_article(item) for item in results[:bounded_limit]]
         articles = [article for article in articles if article["title"]]
         return {

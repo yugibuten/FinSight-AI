@@ -40,7 +40,7 @@ def test_compare_stocks_ranks_by_calculated_return() -> None:
 def test_history_calculates_return_from_mocked_market_data() -> None:
     dates = pd.to_datetime(["2026-01-01", "2026-01-02"])
     frame = pd.DataFrame({"Close": [100.0, 110.0]}, index=dates)
-    with patch("app.tools.stock_tool.yf.Ticker") as ticker:
+    with patch("app.providers.yahoo.yf.Ticker") as ticker:
         ticker.return_value.history.return_value = frame
         result = get_stock_history("AAPL", "5d")
     assert result["change_percent"] == 10.0

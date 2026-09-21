@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
+from app.core.config import settings
+
 
 logger = logging.getLogger("finsight.cache")
 
@@ -73,9 +75,62 @@ class TTLCache:
         )
 
 
+class RedisBackedTTLCache(TTLCache):
+    """Shared Redis cache with a local fallback when Redis is unavailable."""
+
+    def __init__(self, name: str, redis_url: str, max_entries: int = 500) -> None:
+        super().__init__(name, max_entries)
+        self._redis_url = redis_url
+        self._redis = None
+
+    def _client(self):
+        if self._redis is None:
+            from redis import Redis
+
+            self._redis = Redis.from_url(
+                self._redis_url, decode_responses=True, socket_connect_timeout=1
+            )
+        return self._redis
+
+    def get(self, key: str) -> tuple[bool, Any]:
+        try:
+            raw = self._client().get(f"finsight:{self.name}:{key}")
+            if raw is not None:
+                self._log("cache.hit", key, backend="redis")
+                return True, json.loads(raw)
+        except Exception as exc:
+            logger.warning(
+                "cache.redis_unavailable",
+                extra={"fields": {"cache": self.name, "error": type(exc).__name__}},
+            )
+        return super().get(key)
+
+    def set(self, key: str, value: Any, ttl_seconds: float) -> None:
+        super().set(key, value, ttl_seconds)
+        if ttl_seconds <= 0:
+            return
+        try:
+            self._client().setex(
+                f"finsight:{self.name}:{key}", int(max(1, ttl_seconds)), json.dumps(value)
+            )
+        except Exception as exc:
+            logger.warning(
+                "cache.redis_unavailable",
+                extra={"fields": {"cache": self.name, "error": type(exc).__name__}},
+            )
+
+
 def cache_key(namespace: str, arguments: dict[str, Any]) -> str:
     return f"{namespace}:{json.dumps(arguments, sort_keys=True, separators=(',', ':'))}"
 
 
-tool_cache = TTLCache("tools", max_entries=1_000)
-response_cache = TTLCache("responses", max_entries=250)
+def _cache(name: str, max_entries: int) -> TTLCache:
+    if settings.redis_url is not None:
+        return RedisBackedTTLCache(
+            name, settings.redis_url.get_secret_value(), max_entries=max_entries
+        )
+    return TTLCache(name, max_entries=max_entries)
+
+
+tool_cache = _cache("tools", max_entries=1_000)
+response_cache = _cache("responses", max_entries=250)

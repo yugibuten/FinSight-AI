@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     api_version: str = "v1"
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.5-flash"
+    gemini_fast_model: str = "gemini-3.5-flash"
+    gemini_complex_model: str = "gemini-3.5-flash"
+    redis_url: SecretStr | None = None
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     query_timeout_seconds: float = Field(default=45, ge=5, le=180)
     provider_timeout_seconds: float = Field(default=20, ge=5, le=120)

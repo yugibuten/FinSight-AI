@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from app.tools.company_tool import get_company_details, get_financial_metrics
+from app.tools.company_tool import compare_financial_metrics, get_company_details, get_financial_metrics
 from app.tools.market_tool import get_market_overview
 from app.tools.news_tool import get_financial_news
 
@@ -13,7 +13,7 @@ def test_company_and_metric_adapters() -> None:
         "marketCap": 1000,
         "trailingPE": 20.5,
     }
-    with patch("app.tools.company_tool.yf.Ticker") as ticker:
+    with patch("app.providers.yahoo.yf.Ticker") as ticker:
         ticker.return_value.get_info.return_value = info
         assert get_company_details("AAPL")["name"] == "Apple Inc."
         assert get_financial_metrics("AAPL")["metrics"]["market_cap"] == 1000.0
@@ -31,7 +31,7 @@ def test_news_adapter_keeps_source_url() -> None:
             }
         }
     ]
-    with patch("app.tools.news_tool.yf.Search") as search:
+    with patch("app.providers.yahoo.yf.Search") as search:
         search.return_value.news = raw_news
         result = get_financial_news("markets", 5)
     assert result["articles"][0]["publisher"] == "Example News"
@@ -42,3 +42,12 @@ def test_market_overview_region_validation() -> None:
     result = get_market_overview("MARS")
     assert result["success"] is False
     assert "US, INDIA, or GLOBAL" in result["error"]
+
+
+def test_financial_comparison_calculates_metric_leaders() -> None:
+    apple = {"success": True, "ticker": "AAPL", "metrics": {"trailing_pe": 30, "profit_margin": 0.25}}
+    microsoft = {"success": True, "ticker": "MSFT", "metrics": {"trailing_pe": 25, "profit_margin": 0.35}}
+    with patch("app.tools.company_tool.get_financial_metrics", side_effect=[apple, microsoft]):
+        result = compare_financial_metrics(["AAPL", "MSFT"])
+    assert result["lowest_trailing_pe"] == "MSFT"
+    assert result["highest_profit_margin"] == "MSFT"

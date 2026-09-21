@@ -3,7 +3,9 @@
     "id": "current_price_us",
     "question": "What is Apple's latest stock price?",
     "expected_tools": ["get_stock_price"],
-    "expected_arguments": {"get_stock_price": {"ticker": "AAPL"}}
+    "expected_arguments": {"get_stock_price": {"ticker": "AAPL"}},
+    "expected_plan": {"intent": "stock_price", "entities": ["AAPL"]},
+    "requires_sources": true
   },
   {
     "id": "current_price_india",
@@ -15,13 +17,16 @@
     "id": "history_six_months",
     "question": "How has Tesla performed over the last six months?",
     "expected_tools": ["get_stock_history"],
-    "expected_arguments": {"get_stock_history": {"ticker": "TSLA", "period": "6mo"}}
+    "expected_arguments": {"get_stock_history": {"ticker": "TSLA", "period": "6mo"}},
+    "expected_plan": {"intent": "stock_history", "entities": ["TSLA"], "period": "6mo"},
+    "requires_sources": true
   },
   {
     "id": "compare_one_year",
     "question": "Compare Apple and Microsoft stock performance over one year.",
     "expected_tools": ["compare_stocks"],
-    "expected_arguments": {"compare_stocks": {"tickers": ["AAPL", "MSFT"], "period": "1y"}}
+    "expected_arguments": {"compare_stocks": {"tickers": ["AAPL", "MSFT"], "period": "1y"}},
+    "expected_plan": {"intent": "stock_comparison", "entities": ["AAPL", "MSFT"], "period": "1y"}
   },
   {
     "id": "company_profile",
@@ -61,5 +66,21 @@
     "id": "no_tool_definition",
     "question": "Explain what a price-to-earnings ratio means without looking up any company.",
     "expected_tools": []
+  },
+  {
+    "id": "risk_analytics",
+    "question": "Show NVIDIA's five-year trend, volatility, and maximum drawdown.",
+    "expected_tools": ["get_stock_history"],
+    "expected_arguments": {"get_stock_history": {"ticker": "NVDA", "period": "5y"}},
+    "expected_plan": {"intent": "stock_history", "entities": ["NVDA"], "period": "5y"},
+    "requires_sources": true
+  },
+  {
+    "id": "valuation_comparison",
+    "question": "Compare Apple and Microsoft valuation and profit margins.",
+    "expected_tools": ["compare_financial_metrics"],
+    "expected_arguments": {"compare_financial_metrics": {"tickers": ["AAPL", "MSFT"]}},
+    "expected_plan": {"intent": "stock_comparison", "entities": ["AAPL", "MSFT"]},
+    "requires_sources": true
   }
 ]
