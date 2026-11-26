@@ -455,6 +455,13 @@ selection, critical arguments, and required source evidence. The suite includes
 price, history, market, news, movement explanation, risk analytics, Indian
 symbols, and valuation-comparison cases.
 
+##Preview
+
+
+https://github.com/user-attachments/assets/5305dea6-4919-4197-9f0b-c3506a732c1b
+
+
+
 ## Data and security considerations
 
 Yahoo Finance access through `yfinance` is unofficial and can be delayed,
